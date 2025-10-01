@@ -1,39 +1,34 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { LibrosModule } from './libros/libros.module';
 
-import appConfig from './config/app-config';
-import databaseConfig from './config/database.config';
+// Módulos propios
+import { LibrosModule } from './libros/libros.module';
+import { PrestamosModule } from './prestamos/prestamos.module';
 
 @Module({
   imports: [
-    // Configuración global y organizada
-    ConfigModule.forRoot({
-      isGlobal: true,
-      load: [appConfig, databaseConfig],
+    // Carga variables de entorno de .env en toda la app
+    ConfigModule.forRoot({ isGlobal: true }),
+
+    // Conexión a PostgreSQL con TypeORM (usa variables del .env)
+    TypeOrmModule.forRoot({
+      type: 'postgres',
+      host: process.env.DB_HOST,
+      port: parseInt(process.env.DB_PORT ?? '5432', 10),
+      username: process.env.DB_USER,
+      password: process.env.DB_PASS,
+      database: process.env.DB_NAME,
+      autoLoadEntities: true,
+      synchronize: true, // ⚠️ Solo en desarrollo, no en producción
+      logging: true, // Opcional: ver SQL generado en consola
     }),
 
-    // Conexión a PostgreSQL usando ConfigService
-    TypeOrmModule.forRootAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        type: 'postgres',
-        host: configService.get<string>('database.host'),
-        port: configService.get<number>('database.port'),
-        username: configService.get<string>('database.user'),
-        password: configService.get<string>('database.pass'),
-        database: configService.get<string>('database.name'),
-        autoLoadEntities: true,
-        synchronize: true, // solo en desarrollo
-        logging: true,
-      }),
-    }),
-
+    // Módulos de tu app
     LibrosModule,
+    PrestamosModule,
   ],
   controllers: [AppController],
   providers: [AppService],
