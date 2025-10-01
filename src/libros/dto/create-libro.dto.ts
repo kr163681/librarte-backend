@@ -1,5 +1,11 @@
 /* eslint-disable @typescript-eslint/no-unsafe-call */
-import { IsBoolean, IsOptional, IsString, MinLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsOptional,
+  IsString,
+  MinLength,
+  IsIn,
+} from 'class-validator';
 
 export class CreateLibroDto {
   @IsString()
@@ -13,4 +19,11 @@ export class CreateLibroDto {
   @IsOptional()
   @IsBoolean()
   disponible?: boolean;
+
+  // 👇 Campo nuevo para diferenciar tipo de libro
+  @IsString()
+  @IsIn(['publica', 'tienda'], {
+    message: 'El tipo debe ser "publica" o "tienda"',
+  })
+  tipo: 'publica' | 'tienda';
 }

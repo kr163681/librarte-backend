@@ -7,6 +7,7 @@ import {
   ParseIntPipe,
   Patch,
   Delete,
+  Query, // 👈 agregado para usar ?tipo=
 } from '@nestjs/common';
 import { LibrosService } from './libros.service';
 import { CreateLibroDto } from './dto/create-libro.dto';
@@ -21,9 +22,10 @@ export class LibrosController {
     return this.librosService.create(dto);
   }
 
+  // 👇 Aquí añadimos el filtro por tipo
   @Get()
-  findAll() {
-    return this.librosService.findAll();
+  findAll(@Query('tipo') tipo?: 'publica' | 'tienda') {
+    return this.librosService.findAll(tipo);
   }
 
   @Get(':id')
