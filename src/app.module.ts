@@ -7,6 +7,7 @@ import { AppService } from './app.service';
 // Módulos propios
 import { LibrosModule } from './libros/libros.module';
 import { PrestamosModule } from './prestamos/prestamos.module';
+import { VentasModule } from './ventas/ventas.module'; // 👈 nuevo
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { PrestamosModule } from './prestamos/prestamos.module';
     // Módulos de tu app
     LibrosModule,
     PrestamosModule,
+    VentasModule, // 👈 aquí lo agregamos
   ],
   controllers: [AppController],
   providers: [AppService],

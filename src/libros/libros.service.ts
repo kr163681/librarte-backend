@@ -2,10 +2,16 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DeepPartial, FindOptionsWhere } from 'typeorm';
+import {
+  Repository,
+  DeepPartial,
+  FindOptionsWhere,
+  ILike, // 👈 para búsqueda case-insensitive
+} from 'typeorm';
 import { Libro } from './libro.entity';
 import { CreateLibroDto } from './dto/create-libro.dto';
 import { UpdateLibroDto } from './dto/update-libro.dto';
+import { ListLibrosQuery } from './dto/list-libros.query'; // 👈 DTO de query
 
 @Injectable()
 export class LibrosService {
@@ -28,11 +34,43 @@ export class LibrosService {
     return this.repo.save(libro);
   }
 
-  // NUEVO: permite filtrar por tipo (publica | tienda). Si no se pasa, lista todo.
-  findAll(tipo?: 'publica' | 'tienda') {
-    const where: FindOptionsWhere<Libro> = {};
-    if (tipo) where.tipo = tipo;
-    return this.repo.find({ where });
+  // ✅ NUEVO: paginación + filtro por tipo + búsqueda + orden
+  async findAllPaginated(q: ListLibrosQuery) {
+    const page = q.page ?? 1;
+    const limit = Math.min(q.limit ?? 10, 100);
+    const sortBy = q.sortBy ?? 'id';
+    const order = (q.order ?? 'asc').toUpperCase() as 'ASC' | 'DESC';
+
+    const where: FindOptionsWhere<Libro>[] = [];
+    const base: FindOptionsWhere<Libro> = {};
+
+    if (q.tipo) base.tipo = q.tipo as any;
+
+    if (q.search && q.search.trim() !== '') {
+      const pattern = `%${q.search.trim()}%`;
+      where.push({ ...base, titulo: ILike(pattern) });
+      where.push({ ...base, autor: ILike(pattern) });
+    } else {
+      where.push(base);
+    }
+
+    const [data, total] = await this.repo.findAndCount({
+      where,
+      take: limit,
+      skip: (page - 1) * limit,
+      order: { [sortBy]: order },
+    });
+
+    return {
+      data,
+      meta: {
+        page,
+        limit,
+        total,
+        lastPage: Math.max(1, Math.ceil(total / limit)),
+        hasNext: page * limit < total,
+      },
+    };
   }
 
   async findOne(id: number) {
@@ -49,7 +87,7 @@ export class LibrosService {
     if (dto.autor !== undefined) libro.autor = dto.autor;
     if (dto.disponible !== undefined) libro.disponible = dto.disponible;
 
-    // NUEVO: manejar tipo/stock coherentemente
+    // Manejo de tipo/stock coherente
     const anyDto = dto as any;
     if (anyDto.tipo !== undefined) {
       libro.tipo = anyDto.tipo;
