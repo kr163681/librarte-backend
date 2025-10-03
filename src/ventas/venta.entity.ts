@@ -2,28 +2,25 @@ import {
   Column,
   CreateDateColumn,
   Entity,
-  ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
+  Index,
 } from 'typeorm';
-import { Libro } from '../libros/libro.entity';
+import { VentaItem } from './venta-item.entity';
 
+@Index(['fecha'])
 @Entity()
 export class Venta {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ManyToOne(() => Libro, { eager: true, nullable: false })
-  libro: Libro;
+  @CreateDateColumn()
+  fecha: Date;
 
-  @Column('int')
-  cantidad: number;
-
-  @Column('numeric', { precision: 10, scale: 2 })
-  precioUnitario: string; // guardamos como string para no perder precisión decimal
-
-  @Column('numeric', { precision: 12, scale: 2 })
+  // Guardamos como string (DECIMAL/NUMERIC en DB) para no perder precisión
+  @Column({ type: 'numeric', precision: 12, scale: 2 })
   total: string;
 
-  @CreateDateColumn()
-  fecha: Date; // se setea automáticamente
+  @OneToMany(() => VentaItem, (item) => item.venta, { cascade: true })
+  items: VentaItem[];
 }

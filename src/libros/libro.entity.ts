@@ -17,11 +17,15 @@ export class Libro {
   @Column({ default: true })
   disponible: boolean;
 
-  // NUEVO: tipo de inventario
+  // Tipo de inventario: pública o tienda
   @Column({ type: 'varchar', length: 10, default: 'publica' })
   tipo: TipoInventario;
 
-  // NUEVO: stock (solo aplica a tienda). En pública es null.
+  // Stock (solo aplica a tienda). En pública es null.
   @Column({ type: 'int', nullable: true })
   stock: number | null;
+
+  // 💰 Nuevo: precio (solo aplica a tienda). En pública es null.
+  @Column({ type: 'numeric', precision: 10, scale: 2, nullable: true })
+  precio: string | null;
 }
