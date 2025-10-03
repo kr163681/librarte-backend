@@ -4,17 +4,13 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
-// Módulos propios
 import { LibrosModule } from './libros/libros.module';
 import { PrestamosModule } from './prestamos/prestamos.module';
-import { VentasModule } from './ventas/ventas.module'; // 👈 nuevo
+import { VentasModule } from './ventas/ventas.module';
 
 @Module({
   imports: [
-    // Carga variables de entorno de .env en toda la app
     ConfigModule.forRoot({ isGlobal: true }),
-
-    // Conexión a PostgreSQL con TypeORM (usa variables del .env)
     TypeOrmModule.forRoot({
       type: 'postgres',
       host: process.env.DB_HOST,
@@ -23,14 +19,12 @@ import { VentasModule } from './ventas/ventas.module'; // 👈 nuevo
       password: process.env.DB_PASS,
       database: process.env.DB_NAME,
       autoLoadEntities: true,
-      synchronize: true, // ⚠️ Solo en desarrollo, no en producción
-      logging: true, // Opcional: ver SQL generado en consola
+      synchronize: true, // ⚠️ solo en desarrollo
+      logging: true,
     }),
-
-    // Módulos de tu app
     LibrosModule,
     PrestamosModule,
-    VentasModule, // 👈 aquí lo agregamos
+    VentasModule,
   ],
   controllers: [AppController],
   providers: [AppService],

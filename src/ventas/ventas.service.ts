@@ -1,14 +1,19 @@
+/* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
+/* eslint-disable @typescript-eslint/no-unsafe-return */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unused-vars */
+
 import {
   BadRequestException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, FindOptionsWhere, ILike, Repository } from 'typeorm';
+import { Between, In, Repository, DataSource } from 'typeorm';
 import { Venta } from './venta.entity';
+import { VentaItem } from './venta-item.entity';
 import { CreateVentaDto } from './dto/create-venta.dto';
 import { ListVentasQuery } from './dto/list-ventas.query';
 import { Libro } from '../libros/libro.entity';
@@ -16,90 +21,156 @@ import { Libro } from '../libros/libro.entity';
 @Injectable()
 export class VentasService {
   constructor(
+    private readonly dataSource: DataSource,
     @InjectRepository(Venta) private readonly ventasRepo: Repository<Venta>,
+    @InjectRepository(VentaItem)
+    private readonly itemsRepo: Repository<VentaItem>,
     @InjectRepository(Libro) private readonly librosRepo: Repository<Libro>,
   ) {}
 
   /**
-   * Crea una venta con transacción:
-   * - Verifica que el libro sea tipo "tienda"
+   * Crea una venta con múltiples ítems:
+   * - Verifica que cada libro sea tipo "tienda"
    * - Verifica stock >= cantidad
-   * - Descuenta stock
-   * - Crea la venta
+   * - Usa precioUnitario del payload o el precio del libro
+   * - Descuenta stock por ítem
+   * - Crea cabecera (Venta) + detalle (VentaItem[])
+   * - Todo en transacción
    */
   async create(dto: CreateVentaDto) {
-    const { libroId, cantidad, precioUnitario } = dto;
-
-    if (!Number.isFinite(precioUnitario) || precioUnitario < 0) {
-      throw new BadRequestException('precioUnitario inválido');
+    if (!dto.items?.length) {
+      throw new BadRequestException('La venta debe tener al menos un ítem');
     }
 
-    return this.ventasRepo.manager.transaction(async (em) => {
-      const libro = await em.findOne(Libro, { where: { id: libroId } });
-      if (!libro) throw new NotFoundException('Libro no encontrado');
-      if (libro.tipo !== 'tienda') {
-        throw new BadRequestException(
-          'Solo se pueden vender libros de tipo "tienda"',
-        );
-      }
-      if (libro.stock == null) {
-        throw new BadRequestException('Libro sin stock configurado');
-      }
-      if (libro.stock < cantidad) {
-        throw new BadRequestException(
-          `Stock insuficiente. Disponible: ${libro.stock}`,
-        );
+    return this.dataSource.transaction(async (em) => {
+      // Cargamos todos los libros de una
+      const ids = dto.items.map((i) => i.libroId);
+      const libros = await em
+        .getRepository(Libro)
+        .find({ where: { id: In(ids) } });
+
+      // Mapa para lookup rápido
+      const byId = new Map<number, Libro>();
+      for (const l of libros) byId.set(l.id, l);
+
+      let total = 0;
+      const itemsToPersist: Partial<VentaItem>[] = [];
+
+      for (const it of dto.items) {
+        const libro = byId.get(it.libroId);
+        if (!libro)
+          throw new NotFoundException(`Libro ${it.libroId} no encontrado`);
+
+        if (libro.tipo !== 'tienda') {
+          throw new BadRequestException(
+            `El libro "${libro.titulo}" no es de tipo tienda`,
+          );
+        }
+        if (libro.stock == null) {
+          throw new BadRequestException(
+            `El libro "${libro.titulo}" no maneja stock`,
+          );
+        }
+        if (!Number.isInteger(it.cantidad) || it.cantidad <= 0) {
+          throw new BadRequestException(
+            `Cantidad inválida para el libro ${libro.id}`,
+          );
+        }
+        if (libro.stock < it.cantidad) {
+          throw new BadRequestException(
+            `Stock insuficiente para "${libro.titulo}". Disponible: ${libro.stock}`,
+          );
+        }
+
+        // Precio: prioriza el que venga en el payload; si no, usa libro.precio
+        const precioUnitarioNum =
+          it.precioUnitario ?? (libro.precio ? Number(libro.precio) : null);
+
+        if (
+          precioUnitarioNum == null ||
+          !Number.isFinite(precioUnitarioNum) ||
+          precioUnitarioNum <= 0
+        ) {
+          throw new BadRequestException(
+            `Precio no disponible para "${libro.titulo}". Envía precioUnitario o define libro.precio`,
+          );
+        }
+
+        // Descontar stock en memoria y luego persistimos todos
+        libro.stock = libro.stock - it.cantidad;
+
+        const subtotalNum = precioUnitarioNum * it.cantidad;
+        total += subtotalNum;
+
+        itemsToPersist.push({
+          libroId: libro.id,
+          cantidad: it.cantidad,
+          precioUnitario: precioUnitarioNum.toFixed(2),
+          subtotal: subtotalNum.toFixed(2),
+        });
       }
 
-      // Descontar stock
-      libro.stock = libro.stock - cantidad;
-      await em.save(Libro, libro);
+      // Guardar nuevos stocks
+      await em.getRepository(Libro).save(Array.from(byId.values()));
 
-      // Calcular total (usa string para precisión en SQL numeric)
-      const total = (precioUnitario * cantidad).toFixed(2);
-
-      const venta = em.create(Venta, {
-        libro,
-        cantidad,
-        precioUnitario: precioUnitario.toFixed(2), // como string
-        total,
+      // Crear cabecera de venta
+      const venta = em.getRepository(Venta).create({
+        total: total.toFixed(2),
       });
-      return em.save(Venta, venta);
+      await em.getRepository(Venta).save(venta);
+
+      // Crear ítems
+      const itemsEntities = itemsToPersist.map((i) =>
+        em.getRepository(VentaItem).create({ ...i, ventaId: venta.id }),
+      );
+      await em.getRepository(VentaItem).save(itemsEntities);
+
+      // Devolver venta completa con sus ítems y libros
+      const ventaCompleta = await em.getRepository(Venta).findOne({
+        where: { id: venta.id },
+        relations: ['items', 'items.libro'],
+      });
+
+      return ventaCompleta!;
     });
   }
 
   /**
-   * Listado con paginación y filtros (fecha y título)
+   * Listado con paginación y filtros por fecha (y opcional búsqueda simple por id numérico)
+   * Devuelve también items + libro por cada venta.
    */
   async findAllPaginated(q: ListVentasQuery) {
     const page = q.page ?? 1;
     const limit = Math.min(q.limit ?? 10, 100);
 
-    const where: FindOptionsWhere<Venta> = {};
+    const where: any = {};
 
-    // Filtro por rango de fechas (fecha de creación)
     if (q.from && q.to) {
-      // Entre 00:00 y 23:59 del rango dado
-      const from = new Date(q.from + 'T00:00:00.000Z');
-      const to = new Date(q.to + 'T23:59:59.999Z');
+      // Rango [from 00:00, to 23:59]
+      const from = new Date(q.from);
+      from.setHours(0, 0, 0, 0);
+      const to = new Date(q.to);
+      to.setHours(23, 59, 59, 999);
       where.fecha = Between(from, to);
     } else if (q.from) {
-      const from = new Date(q.from + 'T00:00:00.000Z');
-      where.fecha = Between(from, from);
+      const from = new Date(q.from);
+      from.setHours(0, 0, 0, 0);
+      where.fecha = Between(from, new Date());
     } else if (q.to) {
-      const to = new Date(q.to + 'T23:59:59.999Z');
-      where.fecha = Between(to, to);
+      const to = new Date(q.to);
+      to.setHours(0, 0, 0, 0);
+      where.fecha = Between(new Date(0), to);
     }
 
-    // findAndCount no permite where anidado con relación directamente,
-    // así que hacemos filtro por título con join en query builder si se envía 'titulo'
     if (q.titulo && q.titulo.trim() !== '') {
+      // Filtro por título (join con items y libro)
       const qb = this.ventasRepo
         .createQueryBuilder('venta')
-        .leftJoinAndSelect('venta.libro', 'libro')
+        .leftJoinAndSelect('venta.items', 'item')
+        .leftJoinAndSelect('item.libro', 'libro')
         .where(where.fecha ? 'venta.fecha BETWEEN :from AND :to' : '1=1', {
           from: (where as any).fecha?.low,
-          to: (where as any).fecha?.high,
+          to: where.fecha?.high,
         })
         .andWhere('libro.titulo ILIKE :titulo', {
           titulo: `%${q.titulo.trim()}%`,
@@ -121,9 +192,10 @@ export class VentasService {
       };
     }
 
-    // Sin filtro por título, podemos usar findAndCount con relación eager del libro
+    // Sin filtro por título, cargamos relaciones para ver ítems y libros
     const [data, total] = await this.ventasRepo.findAndCount({
       where,
+      relations: ['items', 'items.libro'],
       order: { id: 'DESC' },
       take: limit,
       skip: (page - 1) * limit,
@@ -142,11 +214,11 @@ export class VentasService {
   }
 
   async findOne(id: number) {
-    const venta = await this.ventasRepo.findOne({ where: { id } });
+    const venta = await this.ventasRepo.findOne({
+      where: { id },
+      relations: ['items', 'items.libro'],
+    });
     if (!venta) throw new NotFoundException('Venta no encontrada');
     return venta;
   }
-
-  // Nota: por lo general no se permite editar/eliminar una venta pasada,
-  // pero si lo quieres, podemos implementar PATCH/DELETE con cuidado de stock.
 }

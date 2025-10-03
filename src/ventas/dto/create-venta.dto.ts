@@ -1,28 +1,35 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsInt, IsNumber, Min } from 'class-validator';
+// src/ventas/dto/create-venta.dto.ts
+import {
+  ArrayMinSize,
+  IsArray,
+  IsInt,
+  IsNumber,
+  IsOptional,
+  IsPositive,
+  ValidateNested,
+} from 'class-validator';
+import { Type } from 'class-transformer';
 
-export class CreateVentaDto {
-  @ApiProperty({
-    example: 7,
-    description: 'ID del libro (debe ser tipo "tienda")',
-  })
+export class CreateVentaItemDto {
   @IsInt()
-  @Min(1)
+  @IsPositive()
   libroId: number;
 
-  @ApiProperty({
-    example: 2,
-    description: 'Cantidad a vender',
-  })
   @IsInt()
-  @Min(1)
+  @IsPositive()
   cantidad: number;
 
-  @ApiProperty({
-    example: 49900,
-    description: 'Precio unitario en pesos (COP) u otra moneda',
-  })
+  // Si no se manda, se usará el precio definido en el Libro
+  @IsOptional()
   @IsNumber()
-  @Min(0)
-  precioUnitario: number;
+  @IsPositive()
+  precioUnitario?: number;
+}
+
+export class CreateVentaDto {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => CreateVentaItemDto)
+  items: CreateVentaItemDto[];
 }
