@@ -15,7 +15,11 @@ import { UpdateLibroDto } from './dto/update-libro.dto';
 import { ListLibrosQuery } from './dto/list-libros.query';
 
 // 👇 importa Swagger
-import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+
+// 👇 importa los DTOs para stock
+import { RestockLibroDto } from './dto/restock-libro.dto';
+import { AjustarStockDto } from './dto/ajustar-stock.dto';
 
 @ApiTags('libros')
 @Controller('libros')
@@ -60,5 +64,26 @@ export class LibrosController {
   @Delete(':id')
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.librosService.remove(id);
+  }
+
+  // ---------- NUEVOS ENDPOINTS DE STOCK ----------
+
+  @ApiOperation({ summary: 'Reponer stock (sumar) - Solo libros de tienda' })
+  @ApiBody({ type: RestockLibroDto })
+  @Post(':id/reponer')
+  restock(@Param('id', ParseIntPipe) id: number, @Body() dto: RestockLibroDto) {
+    return this.librosService.restock(id, dto.cantidad);
+  }
+
+  @ApiOperation({
+    summary: 'Ajustar stock (valor exacto) - Solo libros de tienda',
+  })
+  @ApiBody({ type: AjustarStockDto })
+  @Patch(':id/ajustar-stock')
+  ajustarStock(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: AjustarStockDto,
+  ) {
+    return this.librosService.ajustarStock(id, dto.stock);
   }
 }

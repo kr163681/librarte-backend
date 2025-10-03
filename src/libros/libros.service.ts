@@ -1,6 +1,11 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
+//* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
   Repository,
@@ -105,5 +110,61 @@ export class LibrosService {
     const libro = await this.findOne(id);
     await this.repo.remove(libro);
     return { ok: true };
+  }
+
+  // 👇👇👇 ————— MÉTODOS NUEVOS ————— 👇👇👇
+
+  /**
+   * Reponer stock (sumar) para libros de TIENDA.
+   */
+  async restock(id: number, cantidad: number) {
+    if (!Number.isInteger(cantidad) || cantidad <= 0) {
+      throw new BadRequestException('La cantidad debe ser un entero > 0');
+    }
+
+    return this.repo.manager.transaction(async (em) => {
+      // Para concurrencia fuerte, puedes activar lock pesimista:
+      // const libro = await em.findOne(Libro, { where: { id }, lock: { mode: 'pessimistic_write' } });
+      const libro = await em.findOne(Libro, { where: { id } });
+      if (!libro) throw new NotFoundException('Libro no encontrado');
+      if (libro.tipo !== 'tienda') {
+        throw new BadRequestException(
+          'Solo se reponen libros de tipo "tienda"',
+        );
+      }
+      if (libro.stock == null) {
+        throw new BadRequestException('El libro no tiene stock configurado');
+      }
+
+      libro.stock = libro.stock + cantidad;
+      await em.save(Libro, libro);
+
+      return { ok: true, id: libro.id, stockActual: libro.stock };
+    });
+  }
+
+  /**
+   * Ajustar stock a un valor exacto (inventario) para libros de TIENDA.
+   */
+  async ajustarStock(id: number, stock: number) {
+    if (!Number.isInteger(stock) || stock < 0) {
+      throw new BadRequestException('El stock debe ser un entero >= 0');
+    }
+
+    return this.repo.manager.transaction(async (em) => {
+      // const libro = await em.findOne(Libro, { where: { id }, lock: { mode: 'pessimistic_write' } });
+      const libro = await em.findOne(Libro, { where: { id } });
+      if (!libro) throw new NotFoundException('Libro no encontrado');
+      if (libro.tipo !== 'tienda') {
+        throw new BadRequestException(
+          'Solo se ajusta stock en libros de tipo "tienda"',
+        );
+      }
+
+      libro.stock = stock;
+      await em.save(Libro, libro);
+
+      return { ok: true, id: libro.id, stockActual: libro.stock };
+    });
   }
 }
