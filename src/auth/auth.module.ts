@@ -3,17 +3,21 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { PassportModule } from '@nestjs/passport';
 
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { User } from '../users/user.entity';
+import { JwtStrategy } from './jwt.strategy'; // 👈 agrega la estrategia
+// (Opcional) si quieres tener RolesGuard/JwtAuthGuard como providers globales, los importas aquí
+// import { RolesGuard } from './guards/roles.guard';
+// import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 @Module({
   imports: [
     ConfigModule,
-    // 👇 Hace disponible el Repository<User> dentro de AuthModule
+    PassportModule, // 👈 necesario para passport-jwt
     TypeOrmModule.forFeature([User]),
-    // 👇 Registra JWT leyendo la configuración desde .env si la tienes
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -24,7 +28,12 @@ import { User } from '../users/user.entity';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService],
+  providers: [
+    AuthService,
+    JwtStrategy, // 👈 registra la estrategia
+    // RolesGuard,                                      // (opcional) si lo quieres como provider aquí
+    // JwtAuthGuard,                                    // (normalmente no es necesario registrarlo aquí)
+  ],
   exports: [AuthService],
 })
 export class AuthModule {}

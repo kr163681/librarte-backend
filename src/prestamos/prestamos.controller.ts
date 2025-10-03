@@ -24,9 +24,7 @@ import { RolesGuard } from '../auth/roles.guard';
 export class PrestamosController {
   constructor(private readonly service: PrestamosService) {}
 
-  // ===== Crear préstamo =====
-  // Solo "escuela-admin" puede crear préstamos
-  @ApiOperation({ summary: 'Crear préstamo de un libro (solo escuela-admin)' })
+  @ApiOperation({ summary: 'Crear préstamo (solo escuela-admin)' })
   @ApiBearerAuth('access-token')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('escuela-admin')
@@ -47,8 +45,6 @@ export class PrestamosController {
     return this.service.create(dto);
   }
 
-  // ===== Listar préstamos =====
-  // Escuela-admin ve todos, usuarios-escuela solo los suyos (lo afinamos luego en service)
   @ApiOperation({ summary: 'Listar préstamos' })
   @ApiBearerAuth('access-token')
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -58,8 +54,7 @@ export class PrestamosController {
     return this.service.findAll();
   }
 
-  // ===== Obtener préstamo por ID =====
-  @ApiOperation({ summary: 'Obtener un préstamo por ID' })
+  @ApiOperation({ summary: 'Obtener préstamo por ID' })
   @ApiBearerAuth('access-token')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('escuela-admin', 'usuario-escuela')
@@ -68,9 +63,7 @@ export class PrestamosController {
     return this.service.findOne(id);
   }
 
-  // ===== Actualizar préstamo =====
-  // Solo escuela-admin
-  @ApiOperation({ summary: 'Actualizar préstamo (escuela-admin)' })
+  @ApiOperation({ summary: 'Actualizar préstamo (solo escuela-admin)' })
   @ApiBearerAuth('access-token')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('escuela-admin')
@@ -82,9 +75,7 @@ export class PrestamosController {
     return this.service.update(id, dto);
   }
 
-  // ===== Eliminar préstamo =====
-  // Solo escuela-admin
-  @ApiOperation({ summary: 'Eliminar préstamo (escuela-admin)' })
+  @ApiOperation({ summary: 'Eliminar préstamo (solo escuela-admin)' })
   @ApiBearerAuth('access-token')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('escuela-admin')

@@ -15,7 +15,6 @@ import { CreateLibroDto } from './dto/create-libro.dto';
 import { UpdateLibroDto } from './dto/update-libro.dto';
 import { ListLibrosQuery } from './dto/list-libros.query';
 
-// Swagger
 import {
   ApiBearerAuth,
   ApiBody,
@@ -34,8 +33,6 @@ import { RolesGuard } from '../auth/roles.guard';
 export class LibrosController {
   constructor(private readonly librosService: LibrosService) {}
 
-  // ====== Crear libro ======
-  // Solo administradores (tienda o escuela) pueden crear libros
   @ApiOperation({ summary: 'Crear libro (pública o tienda)' })
   @ApiBearerAuth('access-token')
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -45,8 +42,6 @@ export class LibrosController {
     return this.librosService.create(dto);
   }
 
-  // ====== Listar (paginado, filtro, búsqueda, orden) ======
-  // Público (para que el front pueda listar sin token si quieres)
   @ApiOperation({ summary: 'Listar libros con paginación, filtro y búsqueda' })
   @ApiQuery({ name: 'page', required: false, example: 1 })
   @ApiQuery({ name: 'limit', required: false, example: 10 })
@@ -63,16 +58,12 @@ export class LibrosController {
     return this.librosService.findAllPaginated(query);
   }
 
-  // ====== Obtener por ID ======
-  // Público
   @ApiOperation({ summary: 'Obtener un libro por ID' })
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.librosService.findOne(id);
   }
 
-  // ====== Actualizar libro ======
-  // Admin (tienda o escuela)
   @ApiOperation({ summary: 'Actualizar libro' })
   @ApiBearerAuth('access-token')
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -82,8 +73,6 @@ export class LibrosController {
     return this.librosService.update(id, dto);
   }
 
-  // ====== Eliminar libro ======
-  // Admin (tienda o escuela)
   @ApiOperation({ summary: 'Eliminar libro' })
   @ApiBearerAuth('access-token')
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -93,20 +82,14 @@ export class LibrosController {
     return this.librosService.remove(id);
   }
 
-  // ====== Reponer stock (sumar cantidad) ======
-  // Solo tienda-admin
-  @ApiOperation({
-    summary: 'Reponer stock (sumar cantidad) - Solo libros de tienda',
-  })
+  @ApiOperation({ summary: 'Reponer stock (solo tienda-admin)' })
   @ApiBearerAuth('access-token')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('tienda-admin')
   @ApiBody({
     schema: {
       type: 'object',
-      properties: {
-        cantidad: { type: 'integer', example: 5, minimum: 1 },
-      },
+      properties: { cantidad: { type: 'integer', example: 5, minimum: 1 } },
       required: ['cantidad'],
     },
   })
@@ -118,20 +101,14 @@ export class LibrosController {
     return this.librosService.restock(id, cantidad);
   }
 
-  // ====== Ajustar stock (valor exacto) ======
-  // Solo tienda-admin
-  @ApiOperation({
-    summary: 'Ajustar stock a un valor exacto - Solo libros de tienda',
-  })
+  @ApiOperation({ summary: 'Ajustar stock (solo tienda-admin)' })
   @ApiBearerAuth('access-token')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('tienda-admin')
   @ApiBody({
     schema: {
       type: 'object',
-      properties: {
-        stock: { type: 'integer', example: 20, minimum: 0 },
-      },
+      properties: { stock: { type: 'integer', example: 20, minimum: 0 } },
       required: ['stock'],
     },
   })
