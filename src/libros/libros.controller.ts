@@ -8,30 +8,45 @@ import {
   Patch,
   Delete,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { LibrosService } from './libros.service';
 import { CreateLibroDto } from './dto/create-libro.dto';
 import { UpdateLibroDto } from './dto/update-libro.dto';
 import { ListLibrosQuery } from './dto/list-libros.query';
 
-// 👇 importa Swagger
-import { ApiBody, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+// Swagger
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 
-// 👇 importa los DTOs para stock
-import { RestockLibroDto } from './dto/restock-libro.dto';
-import { AjustarStockDto } from './dto/ajustar-stock.dto';
+// Auth (JWT + Roles)
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { Roles } from '../auth/roles.decorator';
+import { RolesGuard } from '../auth/roles.guard';
 
 @ApiTags('libros')
 @Controller('libros')
 export class LibrosController {
   constructor(private readonly librosService: LibrosService) {}
 
+  // ====== Crear libro ======
+  // Solo administradores (tienda o escuela) pueden crear libros
   @ApiOperation({ summary: 'Crear libro (pública o tienda)' })
+  @ApiBearerAuth('access-token')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('tienda-admin', 'escuela-admin')
   @Post()
   create(@Body() dto: CreateLibroDto) {
     return this.librosService.create(dto);
   }
 
+  // ====== Listar (paginado, filtro, búsqueda, orden) ======
+  // Público (para que el front pueda listar sin token si quieres)
   @ApiOperation({ summary: 'Listar libros con paginación, filtro y búsqueda' })
   @ApiQuery({ name: 'page', required: false, example: 1 })
   @ApiQuery({ name: 'limit', required: false, example: 10 })
@@ -48,42 +63,83 @@ export class LibrosController {
     return this.librosService.findAllPaginated(query);
   }
 
+  // ====== Obtener por ID ======
+  // Público
   @ApiOperation({ summary: 'Obtener un libro por ID' })
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.librosService.findOne(id);
   }
 
+  // ====== Actualizar libro ======
+  // Admin (tienda o escuela)
   @ApiOperation({ summary: 'Actualizar libro' })
+  @ApiBearerAuth('access-token')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('tienda-admin', 'escuela-admin')
   @Patch(':id')
   update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateLibroDto) {
     return this.librosService.update(id, dto);
   }
 
+  // ====== Eliminar libro ======
+  // Admin (tienda o escuela)
   @ApiOperation({ summary: 'Eliminar libro' })
+  @ApiBearerAuth('access-token')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('tienda-admin', 'escuela-admin')
   @Delete(':id')
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.librosService.remove(id);
   }
 
-  // ---------- NUEVOS ENDPOINTS DE STOCK ----------
-
-  @ApiOperation({ summary: 'Reponer stock (sumar) - Solo libros de tienda' })
-  @ApiBody({ type: RestockLibroDto })
+  // ====== Reponer stock (sumar cantidad) ======
+  // Solo tienda-admin
+  @ApiOperation({
+    summary: 'Reponer stock (sumar cantidad) - Solo libros de tienda',
+  })
+  @ApiBearerAuth('access-token')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('tienda-admin')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        cantidad: { type: 'integer', example: 5, minimum: 1 },
+      },
+      required: ['cantidad'],
+    },
+  })
   @Post(':id/reponer')
-  restock(@Param('id', ParseIntPipe) id: number, @Body() dto: RestockLibroDto) {
-    return this.librosService.restock(id, dto.cantidad);
+  restock(
+    @Param('id', ParseIntPipe) id: number,
+    @Body('cantidad') cantidad: number,
+  ) {
+    return this.librosService.restock(id, cantidad);
   }
 
+  // ====== Ajustar stock (valor exacto) ======
+  // Solo tienda-admin
   @ApiOperation({
-    summary: 'Ajustar stock (valor exacto) - Solo libros de tienda',
+    summary: 'Ajustar stock a un valor exacto - Solo libros de tienda',
   })
-  @ApiBody({ type: AjustarStockDto })
+  @ApiBearerAuth('access-token')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('tienda-admin')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        stock: { type: 'integer', example: 20, minimum: 0 },
+      },
+      required: ['stock'],
+    },
+  })
   @Patch(':id/ajustar-stock')
   ajustarStock(
     @Param('id', ParseIntPipe) id: number,
-    @Body() dto: AjustarStockDto,
+    @Body('stock') stock: number,
   ) {
-    return this.librosService.ajustarStock(id, dto.stock);
+    return this.librosService.ajustarStock(id, stock);
   }
 }

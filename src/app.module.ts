@@ -1,3 +1,4 @@
+// src/app.module.ts
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -7,6 +8,10 @@ import { AppService } from './app.service';
 import { LibrosModule } from './libros/libros.module';
 import { PrestamosModule } from './prestamos/prestamos.module';
 import { VentasModule } from './ventas/ventas.module';
+
+// 👇 nuevos
+import { UsersModule } from './users/users.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -22,9 +27,15 @@ import { VentasModule } from './ventas/ventas.module';
       synchronize: true, // ⚠️ solo en desarrollo
       logging: true,
     }),
+
+    // módulos de dominio
     LibrosModule,
     PrestamosModule,
     VentasModule,
+
+    // 👇 agrega estos
+    UsersModule,
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],
