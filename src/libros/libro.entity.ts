@@ -1,4 +1,5 @@
-import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
+import { Categoria } from '../categorias/categorias.entity';
 
 export type TipoInventario = 'publica' | 'tienda';
 
@@ -25,7 +26,16 @@ export class Libro {
   @Column({ type: 'int', nullable: true })
   stock: number | null;
 
-  // 💰 Nuevo: precio (solo aplica a tienda). En pública es null.
+  // Precio (solo aplica a tienda). En pública es null.
   @Column({ type: 'numeric', precision: 10, scale: 2, nullable: true })
   precio: string | null;
+
+  // ✅ NUEVO: Relación con categoría
+
+  @ManyToOne(() => Categoria, (categoria) => categoria.libros, {
+    nullable: true,
+    eager: true, // carga automáticamente la categoría al consultar libros
+    onDelete: 'SET NULL', // si borras la categoría, no se borra el libro
+  })
+  categoria?: Categoria;
 }

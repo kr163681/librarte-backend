@@ -13,6 +13,9 @@ import { VentasModule } from './ventas/ventas.module';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 
+// 👇 importa el módulo de categorías
+import { CategoriasModule } from './categorias/categorias.module';
+
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -32,10 +35,11 @@ import { AuthModule } from './auth/auth.module';
     LibrosModule,
     PrestamosModule,
     VentasModule,
-
-    // 👇 agrega estos
     UsersModule,
     AuthModule,
+
+    // 👇 agrega Categorías
+    CategoriasModule,
   ],
   controllers: [AppController],
   providers: [AppService],

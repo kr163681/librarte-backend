@@ -3,11 +3,13 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Libro } from './libro.entity';
 import { LibrosService } from './libros.service';
 import { LibrosController } from './libros.controller';
+import { Categoria } from '../categorias/categorias.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Libro])],
-  controllers: [LibrosController], // 👈 necesita estar
-  providers: [LibrosService], // 👈 necesita estar
-  exports: [LibrosService],
+  // 👇 Registramos también Categoria porque LibrosService la inyecta
+  imports: [TypeOrmModule.forFeature([Libro, Categoria])],
+  controllers: [LibrosController],
+  providers: [LibrosService],
+  exports: [LibrosService], // (no necesitas exportar TypeOrmModule salvo que otro módulo lo requiera)
 })
 export class LibrosModule {}
