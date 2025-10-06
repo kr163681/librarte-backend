@@ -14,11 +14,19 @@ async function bootstrap() {
   // ✅ CORS habilitado (para cuando conectes frontend)
   app.enableCors({ origin: true, credentials: true });
 
-  // ✅ Swagger - Documentación interactiva
+  // ✅ Swagger - Documentación interactiva con JWT
   const swaggerConfig = new DocumentBuilder()
     .setTitle('LibrArte API')
     .setDescription('API para gestión de librería pública y tienda 📚')
     .setVersion('1.0')
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+      },
+      'access-token', // 👈 nombre que usará Swagger
+    )
     .build();
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);
